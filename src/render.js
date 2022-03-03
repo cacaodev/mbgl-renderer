@@ -13,6 +13,11 @@ import urlLib from 'url'
 
 const TILE_REGEXP = RegExp('mbtiles://([^/]+)/(\\d+)/(\\d+)/(\\d+)')
 const MBTILES_REGEXP = /mbtiles:\/\/(\S+?)(?=[/"]+)/gi
+const REQUEST_HEADERS = {
+    "Referer": "http://127.0.0.1/",
+    "Accept": "image/png,image/svg+xml,image/*;q=0.8,video/*;q=0.8,*/*;q=0.5",
+    "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_4) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/13.1 Safari/605.1.15"
+}
 
 export const isMapboxURL = (url) => url.startsWith('mapbox://')
 export const isMapboxStyleURL = (url) => url.startsWith('mapbox://styles/')
@@ -253,6 +258,7 @@ const getRemoteTile = (url, callback) => {
             url,
             encoding: null,
             gzip: true,
+            headers: REQUEST_HEADERS
         },
         (err, res, data) => {
             if (err) {
@@ -277,11 +283,11 @@ const getRemoteTile = (url, callback) => {
                 default: {
                     // assume error
                     console.error(
-                        `Error with request for: ${url}\nstatus: ${res.statusCode}`
+                        `Error with request for: ${JSON.stringify(url)}\nstatus: ${res.statusCode}`
                     )
                     return callback(
                         new Error(
-                            `Error with request for: ${url}\nstatus: ${res.statusCode}`
+                            `Error with request for: ${JSON.stringify(url)}\nstatus: ${res.statusCode}`
                         )
                     )
                 }
@@ -304,6 +310,7 @@ const getRemoteAsset = (url, callback) => {
             url,
             encoding: null,
             gzip: true,
+            headers: REQUEST_HEADERS
         },
         (err, res, data) => {
             if (err) {
@@ -317,11 +324,11 @@ const getRemoteAsset = (url, callback) => {
                 default: {
                     // assume error
                     console.error(
-                        `Error with request for: ${url}\nstatus: ${res.statusCode}`
+                        `Error with request for: ${JSON.stringify(url)}\nstatus: ${res.statusCode}`
                     )
                     return callback(
                         new Error(
-                            `Error with request for: ${url}\nstatus: ${res.statusCode}`
+                            `Error with request for: ${JSON.stringify(url)}\nstatus: ${res.statusCode}`
                         )
                     )
                 }

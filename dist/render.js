@@ -37,6 +37,11 @@ var _url = _interopRequireDefault(require("url"));
 // sharp must be before zlib and other imports or sharp gets wrong version of zlib and breaks on some servers
 var TILE_REGEXP = RegExp('mbtiles://([^/]+)/(\\d+)/(\\d+)/(\\d+)');
 var MBTILES_REGEXP = /mbtiles:\/\/(\S+?)(?=[/"]+)/gi;
+var REQUEST_HEADERS = {
+  "Referer": "http://127.0.0.1/",
+  "Accept": "image/png,image/svg+xml,image/*;q=0.8,video/*;q=0.8,*/*;q=0.5",
+  "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_4) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/13.1 Safari/605.1.15"
+};
 
 var isMapboxURL = function isMapboxURL(url) {
   return url.startsWith('mapbox://');
@@ -316,7 +321,8 @@ var getRemoteTile = function getRemoteTile(url, callback) {
   (0, _request["default"])({
     url: url,
     encoding: null,
-    gzip: true
+    gzip: true,
+    headers: REQUEST_HEADERS
   }, function (err, res, data) {
     if (err) {
       return callback(err);
@@ -348,8 +354,8 @@ var getRemoteTile = function getRemoteTile(url, callback) {
       default:
         {
           // assume error
-          console.error("Error with request for: ".concat(url, "\nstatus: ").concat(res.statusCode));
-          return callback(new Error("Error with request for: ".concat(url, "\nstatus: ").concat(res.statusCode)));
+          console.error("Error with request for: ".concat(JSON.stringify(url), "\nstatus: ").concat(res.statusCode));
+          return callback(new Error("Error with request for: ".concat(JSON.stringify(url), "\nstatus: ").concat(res.statusCode)));
         }
     }
   });
@@ -368,7 +374,8 @@ var getRemoteAsset = function getRemoteAsset(url, callback) {
   (0, _request["default"])({
     url: url,
     encoding: null,
-    gzip: true
+    gzip: true,
+    headers: REQUEST_HEADERS
   }, function (err, res, data) {
     if (err) {
       return callback(err);
@@ -385,8 +392,8 @@ var getRemoteAsset = function getRemoteAsset(url, callback) {
       default:
         {
           // assume error
-          console.error("Error with request for: ".concat(url, "\nstatus: ").concat(res.statusCode));
-          return callback(new Error("Error with request for: ".concat(url, "\nstatus: ").concat(res.statusCode)));
+          console.error("Error with request for: ".concat(JSON.stringify(url), "\nstatus: ").concat(res.statusCode));
+          return callback(new Error("Error with request for: ".concat(JSON.stringify(url), "\nstatus: ").concat(res.statusCode)));
         }
     }
   });
