@@ -1,30 +1,18 @@
 # Static Map Renderer using Mapbox GL
 
-[![Build Status](https://travis-ci.org/consbio/mbgl-renderer.svg?branch=master)](https://travis-ci.org/consbio/mbgl-renderer)
+[![Coverage Status](https://coveralls.io/repos/github/consbio/mbgl-renderer/badge.svg?branch=main)](https://coveralls.io/github/consbio/mbgl-renderer?branch=main)
 
-[![Coverage Status](https://coveralls.io/repos/github/consbio/mbgl-renderer/badge.svg?branch=master)](https://coveralls.io/github/consbio/mbgl-renderer?branch=master)
-
-Create static map images using Mapbox GL with a command-line interface, an HTTP interface, and a NodeJS API.
-
-## WARNING
-
-This project depends on the Mapbox GL bindings for NodeJS, which are no longer maintained by Mapbox. These require
-NodeJS 10, which is now beyond end of life for that version.
-
-We are monitoring the ecosystem for other alternatives (e.g., MapLibre) but have not yet identified a suitable replacement
-for the NodeJS bindings from Mapbox. Feel free to create an issue to report discovery of a suitable replacement.
-
-As such, this project is largely in maintenance mode, and we are unlikely to make major changes in functionality.
+Create static map images using MapLibre GL with a command-line interface, an HTTP interface, and a NodeJS API.
 
 ## Features:
 
--   Render static maps using NodeJS with [mapbox-gl-native](https://github.com/mapbox/mapbox-gl-native)
--   Supports raster and vector tiles
--   Compatible with Mapbox tiles (don't forget attribution) and other hosted tile providers
--   Use locally hosted mbtiles
--   Add GeoJSON overlays to your maps
--   Supports high DPI rendering
--   Also available for use in Docker
+- Render static maps using NodeJS with [maplibre-gl-native](https://github.com/maplibre/maplibre-gl-native)
+- Supports raster and vector tiles
+- Compatible with Mapbox tiles (don't forget attribution) and other hosted tile providers
+- Use locally hosted mbtiles
+- Add GeoJSON overlays to your maps
+- Supports high DPI rendering
+- Also available for use in Docker
 
 [Blog post](https://medium.com/@brendan_ward/creating-a-static-map-renderer-using-the-mapbox-gl-native-nodejs-api-23db560b219e) describing the background and goals in a bit more detail.
 
@@ -53,9 +41,10 @@ or
 
 ### Supported versions of NodeJS:
 
--   10
+- 16
+- 18
 
-Only NodeJS versions with `@mapbox/mapbox-gl-native` binaries built by Mapbox are supported via `npm install`, otherwise you need to build `@mapbox/mapbox-gl-native` from source yourself. See [build instructions](https://github.com/mapbox/mapbox-gl-native/blob/master/platform/node/DEVELOPING.md) for more information.
+Only NodeJS versions with `@maplibre/maplibre-gl-native` binaries built by MapLibre are supported via `npm install`, otherwise you need to build `@maplibre/maplibre-gl-native` from source yourself. See [build instructions](https://github.com/maplibre/maplibre-gl-native/tree/main/platform/node) for more information.
 
 On a server, in addition to build tools, you need to install a GL environment. See the `Dockerfile` and `entrypoint.sh` for an example setup.
 
@@ -320,15 +309,15 @@ http://localhost:8080/render
 
 Include the following query parameters:
 
--   `height` and `width` are integer values (required).
--   `zoom` is a floating point value.
--   `ratio` is an integer value.
--   `center` if provided must be a `longitude,latitude` with floating point values (NO spaces or brackets).
--   `bounds` if provided must be `west,south,east,north` with floating point values (NO spaces or brackets).
--   `padding` if provided must be an integer value that is less than 1/2 of width or height, whichever is smaller. Can only be used with bounds.
--   `bearing is a floating point value (0-360)`pitch`is a floating point value (0-60).
--   `token` if provided must a string.
--   `images` if provided must be URL encoded JSON object (see `images` property above).
+- `height` and `width` are integer values (required).
+- `zoom` is a floating point value.
+- `ratio` is an integer value.
+- `center` if provided must be a `longitude,latitude` with floating point values (NO spaces or brackets).
+- `bounds` if provided must be `west,south,east,north` with floating point values (NO spaces or brackets).
+- `padding` if provided must be an integer value that is less than 1/2 of width or height, whichever is smaller. Can only be used with bounds.
+- `bearing is a floating point value (0-360)`pitch`is a floating point value (0-60).
+- `token` if provided must a string.
+- `images` if provided must be URL encoded JSON object (see `images` property above).
 
 Your style JSON needs to be URL encoded:
 
@@ -374,10 +363,10 @@ This uses the `pixelmatch` package to determine if output images match those tha
 
 ## Docker
 
-Pull the latest image from [Docker Hub](https://hub.docker.com/r/consbio/mbgl-renderer):
+Pull the latest image from [Github Container Registry](https://github.com/consbio/mbgl-renderer/pkgs/container/mbgl-renderer):
 
 ```
-docker pull consbio/mbgl-renderer:latest
+docker pull ghcr.io/consbio/mbgl-renderer:latest
 ```
 
 To run `mbgl-server` in the docker container on port 8080:
@@ -404,71 +393,12 @@ docker build -t <image_name> -f docker/Dockerfile .
 
 In order to use this package on a headless server, you need to use `xvfb`. See `docker/Dockerfile` and `docker/entrypoint.sh` for the basic configuration.
 
-## Changes
-
-### 0.8.0
-
--   upgrade NodeJS version in Docker and use newer base OS
--   added ability to provide images that can be used for `icon-image`, `line-pattern`, `fill-pattern` properties in style
-
-### 0.7.3
-
--   actually skip request logging for docker health check
--   avoid nesting error messages
--   upgraded JS dependencies
-
-Potentially breaking:
-
--   @mapbox/geo-viewport 0.4.1 included a fix for calculating center points, which
-    causes a small change in the center and zoom level automatically calculated
-    here when `bounds` are provided for rendering. If you depend on precise
-    control over how `bounds` are used for rendering, please check the outputs
-    after upgrading.
-
-### 0.7.2
-
--   skip request logging for routes that do not exist (e.g., docker health check)
-
-### 0.7.1
-
--   Fixed handling of `NaN` and `Infinity` in inputs for `bounds` and `center` (#58)
-
-### 0.7.0
-
--   Added support for padding image bounds
--   Handle missing remote assets correctly (#49)
--   Added support for image sources (#52)
--   Added request logging (#54)
-
-### 0.6.2
-
--   Fix bad handling of root path (#43)
-
-### 0.6.1
-
--   Docker: fix missing `/app/tiles` directory if user does not bind in a tiles directory (resolves #40)
-
-### 0.6.0
-
--   upgraded `mapbox-gl-native` to 5.0.0 (#35). NOTE: [fallback to source builds of `mapbox-gl-native` are no longer supported](https://github.com/mapbox/mapbox-gl-native/blob/master/platform/node/CHANGELOG.md#500).
--   warn rather than fail on missing tiles
-
-### O.5.0
-
--   upgraded Docker to NodeJS 10
--   reduced size of Docker image and simplified Xvfb management
--   added support for `pitch` and `bearing` options during rendering (#31)
-
-### 0.4.0
-
--   rendering now uses floating point zoom levels when `bounds` are provided as inputs
--   downgraded supported version of Node to 8, due to occasional segfaults: https://github.com/mapbox/mapbox-gl-native/issues/12252
-
-Prior to `0.3.1`, there was a significant bug in rendering layers with transparency (#25).
-
 ## Credits
 
-This project was made possible based on support from the South Atlantic Landscape Conservation Cooperative (http://www.southatlanticlcc.org/) and the Paulson Institute (http://www.paulsoninstitute.org/).
+This project was made possible based on support from the
+[South Atlantic Landscape Conservation Cooperative](http://www.southatlanticlcc.org/),
+the [Paulson Institute](http://www.paulsoninstitute.org/), and the
+[California Department of Food and Agriculture - Office of Environmental Farming & Innovation](https://www.cdfa.ca.gov/oefi/).
 
 ## Contributors ✨
 

@@ -5,8 +5,9 @@ import path from 'path'
 import sharp from 'sharp'
 import zlib from 'zlib'
 import geoViewport from '@mapbox/geo-viewport'
-import mbgl from '@mapbox/mapbox-gl-native'
+import maplibre from '@maplibre/maplibre-gl-native'
 import MBTiles from '@mapbox/mbtiles'
+import pino from 'pino'
 import webRequest from 'request'
 
 import urlLib from 'url'
@@ -18,6 +19,40 @@ const REQUEST_HEADERS = {
     "Accept": "image/png,image/svg+xml,image/*;q=0.8,video/*;q=0.8,*/*;q=0.5",
     "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_4) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/13.1 Safari/605.1.15"
 }
+
+const logger = pino({
+    formatters: {
+        level: (label) => ({ level: label }),
+    },
+    redact: {
+        paths: ['pid', 'hostname'],
+        remove: true,
+    },
+})
+
+maplibre.on('message', (msg) => {
+    // console.log(msg.severity, msg.class, msg.text)
+    switch (msg.severity) {
+        case 'ERROR': {
+            logger.error(msg.text)
+            break
+        }
+        case 'WARNING': {
+            if (msg.class === 'ParseStyle') {
+                logger.error(`Error parsing style: ${msg.text}`)
+            } else {
+                logger.warn(msg.text)
+            }
+            break
+        }
+
+        default: {
+            // NOTE: includes INFO
+            logger.debug(msg.text)
+            break
+        }
+    }
+})
 
 export const isMapboxURL = (url) => url.startsWith('mapbox://')
 export const isMapboxStyleURL = (url) => url.startsWith('mapbox://styles/')
@@ -223,7 +258,6 @@ const getLocalTile = (tilePath, url, callback) => {
 
         mbtiles.getTile(z, x, y, (tileErr, data) => {
             if (tileErr) {
-                // console.error(`error fetching tile: z:${z} x:${x} y:${y} from ${mbtilesFile}\n${tileErr}`)
                 callback(null, {})
                 return null
             }
@@ -277,17 +311,14 @@ const getRemoteTile = (url, callback) => {
                     // Tile not found
                     // this may be valid for some tilesets that have partial coverage
                     // on servers that do not return blank tiles in these areas.
-                    console.warn(`Missing tile at: ${url}`)
+                    logger.warn(`Missing tile at: ${url}`)
                     return callback(null, {})
                 }
                 default: {
                     // assume error
-                    console.error(
-                        `Error with request for: ${JSON.stringify(url)}\nstatus: ${res.statusCode}`
-                    )
                     return callback(
                         new Error(
-                            `Error with request for: ${JSON.stringify(url)}\nstatus: ${res.statusCode}`
+                            `request for remote tile failed: ${url} (status: ${res.statusCode})`
                         )
                     )
                 }
@@ -322,13 +353,9 @@ const getRemoteAsset = (url, callback) => {
                     return callback(null, { data })
                 }
                 default: {
-                    // assume error
-                    console.error(
-                        `Error with request for: ${JSON.stringify(url)}\nstatus: ${res.statusCode}`
-                    )
                     return callback(
                         new Error(
-                            `Error with request for: ${JSON.stringify(url)}\nstatus: ${res.statusCode}`
+                            `request for remote asset failed: ${res.request.uri.href} (status: ${res.statusCode})`
                         )
                     )
                 }
@@ -366,7 +393,7 @@ const requestHandler =
     ({ url, kind }, callback) => {
         const isMapbox = isMapboxURL(url)
         if (isMapbox && !token) {
-            throw new Error('ERROR: mapbox access token is required')
+            return callback(new Error('mapbox access token is required'))
         }
 
         try {
@@ -439,14 +466,14 @@ const requestHandler =
                 }
                 default: {
                     // NOT HANDLED!
-                    throw new Error(`ERROR: Request kind not handled: ${kind}`)
+                    throw new Error(`error Request kind not handled: ${kind}`)
                 }
             }
         } catch (err) {
-            console.error(
+            logger.error(
                 `Error while making resource request to: ${url}\n${err}`
             )
-            callback(err)
+            return callback(err)
         }
     }
 
@@ -702,10 +729,11 @@ export const render = async (style, width = 1024, height = 1024, options) => {
         })
     }
 
-    const map = new mbgl.Map({
+    const map = new maplibre.Map({
         request: requestHandler(tilePath, token),
         ratio,
     })
+
     map.load(style)
 
     await loadImages(map, images)

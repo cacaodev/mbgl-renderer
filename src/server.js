@@ -3,20 +3,13 @@ import fs from 'fs'
 import restify from 'restify'
 import restifyValidation from 'node-restify-validation'
 import restifyErrors from 'restify-errors'
-import cli from 'commander'
-import logger from 'morgan'
+import { program, InvalidOptionArgumentError } from 'commander'
+import pino from 'restify-pino-logger'
 
 import { version } from '../package.json'
 import { render } from './render'
 
-logger.token('url', (req) => req.path())
-
 const parseListToFloat = (text) => text.split(',').map(Number)
-
-const raiseError = (msg) => {
-    console.error('ERROR:', msg)
-    process.exit(1)
-}
 
 const PARAMS = {
     style: { isRequired: true, isString: true },
@@ -31,7 +24,7 @@ const PARAMS = {
     images: { isRequired: false, isObject: true },
 }
 
-const renderImage = (params, response, next, tilePath) => {
+const renderImage = (params, response, next, tilePath, logger) => {
     const {
         width,
         height,
@@ -53,7 +46,6 @@ const renderImage = (params, response, next, tilePath) => {
         try {
             style = JSON.parse(style)
         } catch (jsonErr) {
-            console.error('Error parsing JSON style in request: %j', jsonErr)
             return next(
                 new restifyErrors.BadRequestError(
                     { cause: jsonErr },
@@ -225,6 +217,7 @@ const renderImage = (params, response, next, tilePath) => {
             }
             try {
                 // use new URL to validate URL
+                /* eslint-disable-next-line no-unused-vars */
                 const url = new URL(image.url)
             } catch (e) {
                 return next(
@@ -251,7 +244,7 @@ const renderImage = (params, response, next, tilePath) => {
         })
             .then((data, rejected) => {
                 if (rejected) {
-                    console.error('render request rejected', rejected)
+                    logger.error('render request rejected', rejected)
                     return next(
                         new restifyErrors.InternalServerError(
                             { cause: rejected },
@@ -268,7 +261,7 @@ const renderImage = (params, response, next, tilePath) => {
                     return next(err)
                 }
 
-                console.error('Error processing render request', err)
+                logger.error('Error processing render request', err)
                 return next(
                     new restifyErrors.InternalServerError(
                         { cause: err },
@@ -281,7 +274,7 @@ const renderImage = (params, response, next, tilePath) => {
             return next(err)
         }
 
-        console.error('Error processing render request', err)
+        logger.error('Error processing render request', err)
         return next(
             new restifyErrors.InternalServerError(
                 { cause: err },
@@ -294,19 +287,30 @@ const renderImage = (params, response, next, tilePath) => {
 }
 
 // Provide the CLI
-cli.version(version)
+program
+    .version(version)
     .description('Start a server to render Mapbox GL map requests to images.')
     .option('-p, --port <n>', 'Server port', parseInt)
     .option(
         '-t, --tiles <mbtiles_path>',
-        'Directory containing local mbtiles files to render'
+        'Directory containing local mbtiles files to render',
+        (tilePath) => {
+            if (!fs.existsSync(tilePath)) {
+                throw new InvalidOptionArgumentError(
+                    `Path to mbtiles files does not exist: ${tilePath}`
+                )
+            }
+            return tilePath
+        }
     )
     .option('-v, --verbose', 'Enable request logging')
     .parse(process.argv)
 
-const { port = 8000, tiles: tilePath = null, verbose = false } = cli
+const { port = 8000, tiles: tilePath = null, verbose = false } = program.opts()
 
 export const server = restify.createServer({
+    name: 'mbgl-renderer',
+    version: '1.0.0',
     ignoreTrailingSlash: true,
 })
 server.use(restify.plugins.queryParser())
@@ -319,17 +323,26 @@ server.use(
     })
 )
 
-if (verbose) {
-    server.use(
-        logger('dev', {
-            // only log valid endpoints
-            // specifically ignore health check endpoint
-            skip(req, res) {
-                return req.statusCode === 404 || req.path() === '/health'
-            },
-        })
-    )
-}
+server.use(
+    pino({
+        enabled: verbose,
+        autoLogging: {
+            ignorePaths: ['/health'],
+        },
+        redact: {
+            paths: [
+                'pid',
+                'hostname',
+                'res.headers.server',
+                'req.id',
+                'req.connection',
+                'req.remoteAddress',
+                'req.remotePort',
+            ],
+            remove: true,
+        },
+    })
+)
 
 /**
  * /render (GET): renders an image based on request query parameters.
@@ -341,7 +354,7 @@ server.get(
             queries: PARAMS,
         },
     },
-    (req, res, next) => renderImage(req.query, res, next, tilePath)
+    (req, res, next) => renderImage(req.query, res, next, tilePath, req.log)
 )
 
 /**
@@ -354,13 +367,13 @@ server.post(
             content: PARAMS,
         },
     },
-    (req, res, next) => renderImage(req.body, res, next, tilePath)
+    (req, res, next) => renderImage(req.body, res, next, tilePath, req.log)
 )
 
 /**
  * List all available endpoints.
  */
-server.get({ url: '/' }, (req, res) => {
+server.get({ url: '/' }, (req, res, next) => {
     const routes = {}
     Object.values(server.router.getRoutes()).forEach(
         ({ spec: { url, method } }) => {
@@ -375,6 +388,8 @@ server.get({ url: '/' }, (req, res) => {
         routes,
         version,
     })
+
+    return next()
 })
 
 /**
@@ -385,18 +400,17 @@ server.get({ url: '/health' }, (req, res, next) => {
     next()
 })
 
+let tilePathMessage = ''
 if (tilePath !== null) {
-    if (!fs.existsSync(tilePath)) {
-        raiseError(`Path to mbtiles files does not exist: ${tilePath}`)
-    }
-
-    console.log('Using local mbtiles in: %j', tilePath)
+    tilePathMessage = `\n using local mbtiles in: ${tilePath}`
 }
 
 server.listen(port, () => {
     console.log(
-        'Mapbox GL static rendering server started and listening at %s',
-        server.url
+        '\n-----------------------------------------------------------------\n',
+        `mbgl-renderer server started and listening at ${server.url}`,
+        tilePathMessage,
+        '\n-----------------------------------------------------------------\n'
     )
 })
 
